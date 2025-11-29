@@ -1,7 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../store/store';
-import { fetchProducts, setFilters } from '../store/slices/productsSlice';
+import {
+  fetchProducts,
+  setFilters,
+  clearFilters,
+} from '../store/slices/productsSlice';
 import { fetchCategories } from '../store/slices/categoriesSlice';
 import { ProductGrid } from '../components/products/ProductGrid';
 import { ProductFilters } from '../components/products/ProductFilters';
@@ -20,6 +24,7 @@ export const Shop: React.FC = () => {
   );
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [currentPage, setCurrentPage] = useState(1);
 
   const debouncedSearch = useDebounce(filters.search, 500);
 
@@ -44,7 +49,7 @@ export const Shop: React.FC = () => {
 
   useEffect(() => {
     const fetchParams: any = {
-      page: 1,
+      page: currentPage,
       page_size: 12,
     };
 
@@ -62,7 +67,7 @@ export const Shop: React.FC = () => {
     if (filters.minPrice > 0) {
       fetchParams.min_price = filters.minPrice;
     }
-    if (filters.maxPrice > 0 && filters.maxPrice < 1000) {
+    if (filters.maxPrice < 1000) {
       fetchParams.max_price = filters.maxPrice;
     }
 
@@ -81,6 +86,7 @@ export const Shop: React.FC = () => {
     dispatch(fetchProducts(fetchParams) as any);
   }, [
     dispatch,
+    currentPage,
     filters.category,
     filters.size,
     filters.ordering,
@@ -90,24 +96,13 @@ export const Shop: React.FC = () => {
   ]);
 
   const handlePageChange = (page: number) => {
-    const fetchParams: any = {
-      page,
-      page_size: 12,
-    };
-
-    if (filters.search) fetchParams.search = filters.search;
-    if (filters.category) fetchParams.category__slug = filters.category;
-    if (filters.minPrice > 0) fetchParams.min_price = filters.minPrice;
-    if (filters.maxPrice > 0 && filters.maxPrice < 1000)
-      fetchParams.max_price = filters.maxPrice;
-    if (filters.size) fetchParams.variants__size = filters.size;
-    if (filters.ordering) fetchParams.ordering = filters.ordering;
-
-    dispatch(fetchProducts(fetchParams) as any);
+    setCurrentPage(page);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleSearchChange = (query: string) => {
     dispatch(setFilters({ search: query }));
+    setCurrentPage(1);
   };
 
   const handlePriceRangeChange = (min: number, max: number) => {
@@ -117,13 +112,13 @@ export const Shop: React.FC = () => {
         maxPrice: max,
       })
     );
+    setCurrentPage(1);
   };
 
   const handleClearFilters = () => {
     dispatch(clearFilters());
+    setCurrentPage(1);
   };
-
-  // handling pagination
 
   const totalPages = Math.ceil(pagination.count / 12);
 
@@ -197,7 +192,7 @@ export const Shop: React.FC = () => {
           {/* Filters Sidebar */}
           <div className='lg:w-64 flex-shrink-0'>
             <ProductFilters
-              categories={categories} // Pass the actual categories array
+              categories={categories}
               isOpen={isFiltersOpen}
               onClose={() => setIsFiltersOpen(false)}
               onPriceRangeChange={handlePriceRangeChange}
@@ -217,37 +212,29 @@ export const Shop: React.FC = () => {
               <div className='flex justify-center items-center space-x-2 mt-12'>
                 <Button
                   variant='outline'
-                  disabled={!pagination.previous}
-                  onClick={() => {
-                    const previousPage = pagination.previous
-                      ? parseInt(
-                          new URL(pagination.previous).searchParams.get(
-                            'page'
-                          ) || '1'
-                        )
-                      : 1;
-                    handlePageChange(previousPage - 1);
-                  }}
+                  disabled={currentPage === 1}
+                  onClick={() => handlePageChange(currentPage - 1)}
                 >
                   Previous
                 </Button>
 
+                {/* Page Numbers */}
                 {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
-                  const page = i + 1;
+                  let page;
+                  if (totalPages <= 5) {
+                    page = i + 1;
+                  } else if (currentPage <= 3) {
+                    page = i + 1;
+                  } else if (currentPage >= totalPages - 2) {
+                    page = totalPages - 4 + i;
+                  } else {
+                    page = currentPage - 2 + i;
+                  }
+
                   return (
                     <Button
                       key={page}
-                      variant={
-                        page ===
-                        parseInt(
-                          new URL(pagination.next || '').searchParams.get(
-                            'page'
-                          ) || '2'
-                        ) -
-                          1
-                          ? 'primary'
-                          : 'outline'
-                      }
+                      variant={page === currentPage ? 'primary' : 'outline'}
                       onClick={() => handlePageChange(page)}
                     >
                       {page}
@@ -257,16 +244,8 @@ export const Shop: React.FC = () => {
 
                 <Button
                   variant='outline'
-                  disabled={!pagination.next}
-                  onClick={() => {
-                    const nextPage = pagination.next
-                      ? parseInt(
-                          new URL(pagination.next).searchParams.get('page') ||
-                            '2'
-                        )
-                      : 2;
-                    handlePageChange(nextPage);
-                  }}
+                  disabled={currentPage === totalPages}
+                  onClick={() => handlePageChange(currentPage + 1)}
                 >
                   Next
                 </Button>
@@ -278,6 +257,3 @@ export const Shop: React.FC = () => {
     </div>
   );
 };
-
-// Add missing import
-import { clearFilters } from '../store/slices/productsSlice';
