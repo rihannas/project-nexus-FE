@@ -123,6 +123,8 @@ export const Shop: React.FC = () => {
     dispatch(clearFilters());
   };
 
+  // handling pagination
+
   const totalPages = Math.ceil(pagination.count / 12);
 
   return (
